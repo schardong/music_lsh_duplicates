@@ -9,12 +9,12 @@ from bs4 import BeautifulSoup
 
 
 LYRICS = []
-OUTPUT_PICKLE_PATH = 'lyrics_pickle_output_1'
+OUTPUT_PICKLE_PATH = 'lyrics_pickle_output_letras'
 
 
-def save_artist_lyrics(artist_name, artist_lyrics, artist_lyrics_names):
+def save_artist_lyrics(website_name, artist_name, artist_lyrics, artist_lyrics_names):
     for lyrics_name, lyrics in zip(artist_lyrics_names, artist_lyrics):
-        LYRICS.append(('letras.mus.br', artist_name, lyrics_name, lyrics))
+        LYRICS.append((website_name, artist_name, lyrics_name, lyrics))
 
 
 def crawl_letras():
@@ -74,7 +74,8 @@ def crawl_letras():
             clean_string_inside = '\n'.join(string_inside.split('<br/>'))
             ret.append(clean_string_inside)
         return '\n'.join(ret)
-
+    
+    website_name = 'letras.mus.br'
     base_url = 'https://www.letras.mus.br'
     start_url = 'https://www.letras.mus.br/letra/A/artistas.html'
 
@@ -95,23 +96,7 @@ def crawl_letras():
             artist_lyrics_names.append(song_name)
             print('\t'+song_name)
         # Let's remove the leadind '/' in the artist name.
-        save_artist_lyrics(artist_name[1:], artist_lyrics, artist_lyrics_names)
-
-
-def crawl_vagalume():
-    start_url = 'https://www.vagalume.com.br/browse/a.html'
-
-
-def crawl_musica():
-    start_url = 'http://www.musica.com/letras.asp?g=A'
-
-
-def crawl_cifraclub():
-    start_url = 'https://www.cifraclub.com.br/cifras/letra_a.html'
-
-
-def crawl_letrasdemusicas():
-    start_url = 'http://www.letrasdemusicas.com.br/listagemartistas/a.html'
+        save_artist_lyrics(website_name, artist_name[1:], artist_lyrics, artist_lyrics_names)
 
 
 if __name__ == '__main__':
@@ -119,7 +104,3 @@ if __name__ == '__main__':
         crawl_letras()
     finally:
         pickle.dump(LYRICS, open(OUTPUT_PICKLE_PATH, 'wb'))
-    # crawl_vagalume()
-    # crawl_musica()
-    # crawl_cifraclub()
-    # crawl_letrasdemusicas()
