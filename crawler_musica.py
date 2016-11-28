@@ -69,7 +69,7 @@ def crawl_musica():
         lyrics_tags = soup.find_all(is_lyrics)
         string_inside = str(lyrics_tags[0])
         string_inside = string_inside[string_inside.find('">') + 2: string_inside.rfind('</font')]
-        clean_string_inside = '\n'.join(string_inside.replace('\r', '').replace('</br>', '').split(
+        clean_string_inside = '\n'.join(string_inside.replace('\r', '').replace('</br>', '').replace('<br/>', '').split(
             '<br>'))
         return clean_string_inside
 
@@ -88,9 +88,12 @@ def crawl_musica():
         print(artist_name)
         for song_URL, song_name in songs_URLs:
             song_html = urllib.request.urlopen(base_url + song_URL).read()
-            artist_lyrics.append(get_lyrics(song_html))
-            artist_lyrics_names.append(song_name)
-            print('\t' + song_name)
+            try:            
+                artist_lyrics.append(get_lyrics(song_html))
+                artist_lyrics_names.append(song_name)
+                print('\t' + song_name)
+            except:
+                pass
         save_artist_lyrics(website_name, artist_name, artist_lyrics, artist_lyrics_names)
 
 

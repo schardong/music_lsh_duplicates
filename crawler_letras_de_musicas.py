@@ -90,7 +90,6 @@ def crawl_letras():
                 artist_lyrics.append(get_lyrics(song_html))
                 artist_lyrics_names.append(song_name)
                 print('\t'+song_name)
-                print(artist_lyrics)
             save_artist_lyrics(website_name, artist_name, artist_lyrics, artist_lyrics_names)
 
 
