@@ -5,6 +5,7 @@ import re
 import os
 import string
 import pickle
+import editdistance
 from datasketch import MinHash, MinHashLSH
 
 # Algorithm outline:
@@ -21,10 +22,10 @@ from datasketch import MinHash, MinHashLSH
 
 #Tasks:
 # Artist name normalization function (replace special characters by spaces. Replace quotes by nothing).
-# Pre-process the songs lyrics to remove special characters.
+# Pre-process the songs lyrics to remove special characters before building the shingles.
 
 
-def build_shingle_list(input_str, ngram_size=3, regex_prog=None):
+def build_shingle_list(input_str, ngram_size=3):
     """
     Given a text, this function builds it's n-grams.
 
@@ -43,16 +44,14 @@ def build_shingle_list(input_str, ngram_size=3, regex_prog=None):
     Returns:
     A list of n-grams built from the input dataset.
     """
-    tokens = []
     if input_str is None or len(input_str) == 0:
         raise ValueError('Input text must not be empty.')
-    if regex_prog is not None:
-        tokens = regex_prog.split(input_str)
-    else:
-        tokens = input_str.split()
+
+    tokens = input_str.split()
     if ngram_size > len(tokens):
-        return tokens
-    return [" ".join(tokens[i:i+ngram_size]) for i in range(0, len(tokens) - ngram_size + 1)]
+        return ' '.join(tokens)
+
+    return [' '.join(tokens[i:i+ngram_size]) for i in range(0, len(tokens) - ngram_size + 1)]
 
 
 def build_minhash(shingle_list, num_perm=128):
@@ -78,40 +77,75 @@ def build_minhash(shingle_list, num_perm=128):
     return mhash
 
 
+def normalize_string(input_text):
+    """
+    Given an input string, this function removes all special characters and
+    returns a clean version of the original text. Any quote characters are
+    replaced by an empty string.
+
+    Arguments:
+    input_text -- The input string
+
+    Returns:
+    A cleaned-up version of the input text.
+    """
+    if input_text is None or len(input_text) == 0:
+        raise ValueError('Invalid list of song lyrics.')
+
+    tmp_text = input_text.replace('\'', '').lower()
+    normalized_text = re.sub('[' + string.punctuation + string.whitespace + ']',
+                             ' ',
+                             tmp_text)
+    normalized_text = ' '.join(normalized_text.split())
+    return normalized_text
+
+
 if __name__ == '__main__':
     crawler_output_files = [os.path.join('out', 'lyrics_pickle_output_vagalume_0'),
                             os.path.join('out', 'lyrics_pickle_output_letras'),
-                            os.path.join('out', 'lyrics_pickle_output_cifraclub'),
                             os.path.join('out', 'lyrics_pickle_output_musica'),
                             os.path.join('out', 'lyrics_pickle_output_letrasdemusicas')]
 
-    minhash_lsh = MinHashLSH(threshold=0.5)
+    ## Reading the datasets.
     lyrics_by_site = []
     for out_path in crawler_output_files:
+        ## For each website, we load the list of song tuples
+        ## (website, artist-name, song-name, song-lyrics), normalize the artist
+        ## name and song lyrics, and then we add the resulting songs to the
+        ## dataset again.
         if not os.path.exists(out_path):
             continue
         with open(out_path, 'rb') as file_in:
-            lyrics = pickle.load(file_in)
-            lyrics_by_site.extend(lyrics)
-    print('Number of lyrics: {}'.format(len(lyrics_by_site)))
+            lyrics_tuples_list = pickle.load(file_in)
+            for song_idx, song in enumerate(lyrics_tuples_list):
+                if len(song[3]) == 0:
+                    continue
+                song = list(song)
+                song[1] = normalize_string(song[1])
+                song[3] = normalize_string(song[3])
+                lyrics_tuples_list[song_idx] = tuple(song)
 
-    #ascii_chars_prog = re.compile('[' + string.whitespace + string.punctuation + '\n' + ']')
-    for lyric_index, lyrics in enumerate(lyrics_by_site):
-        if lyric_index > 2000:
+            lyrics_by_site.extend(lyrics_tuples_list)
+
+    print('Number of song lyrics: {}'.format(len(lyrics_by_site)))
+
+    mhash_lsh = MinHashLSH(threshold=0.5)
+    for lyric_idx, lyrics in enumerate(lyrics_by_site):
+        ## TODO(gschardong): Remove this after thorough testing.
+        if lyric_idx > 2000:
             break
-        print('Processed {}/{} songs.\n'.format(lyric_index, len(lyrics_by_site)))
+        print('Processed {}/{} songs.'.format(lyric_idx, len(lyrics_by_site)))
         if len(lyrics[3]) == 0:
             continue
-        shingle_list = build_shingle_list(lyrics[3])#, regex_prog=ascii_chars_prog)
+        shingle_list = build_shingle_list(lyrics[3])
         if len(shingle_list) == 0:
             continue
-        minhash = build_minhash(shingle_list)
+        mhash = build_minhash(shingle_list)
         key = lyrics[0] + '|' + lyrics[1] + '|' + lyrics[2]
-        minhash_lsh.insert(key, minhash)
+        mhash_lsh.insert(key, mhash)
 
     possible_duplicates = []
-    for bucket in minhash_lsh.hashtables:
-        total_count += len(bucket.values())
+    for bucket in mhash_lsh.hashtables:
         for elem in bucket.values():
             if len(elem) > 1:
                 possible_duplicates.append(elem)
