@@ -1,9 +1,10 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
-#import pickle
 import re
+import os
 import string
+import pickle
 from datasketch import MinHash, MinHashLSH
 
 # Algorithm outline:
@@ -14,7 +15,9 @@ from datasketch import MinHash, MinHashLSH
 #      song_minhash = build_minhash(list_shingles)
 #      update_lsh(song_minhash)
 
-def build_shingle_list(input_str, n=3, regex_prog = None):
+
+
+def build_shingle_list(input_str, ngram_size=3, regex_prog=None):
     """
     Given a text, this function builds it's n-grams.
 
@@ -36,13 +39,13 @@ def build_shingle_list(input_str, n=3, regex_prog = None):
     tokens = []
     if input_str is None or len(input_str) == 0:
         raise ValueError('Input text must not be empty.')
-    if n > len(input_str):
-        return input_str
     if regex_prog is not None:
         tokens = regex_prog.split(input_str)
     else:
         tokens = input_str.split()
-    return [" ".join(tokens[i:i+n]) for i in range(0, len(tokens) - n + 1)]
+    if ngram_size > len(tokens):
+        return tokens
+    return [" ".join(tokens[i:i+ngram_size]) for i in range(0, len(tokens) - ngram_size + 1)]
 
 
 def build_minhash(shingle_list, num_perm=128):
@@ -67,21 +70,32 @@ def build_minhash(shingle_list, num_perm=128):
         mhash.update(shingle.encode('utf8'))
     return mhash
 
+
 def build_minhash_lsh(minhash_list):
     pass
 
+
 if __name__ == '__main__':
-    str1 = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. In ut vehicula lacus, quis eleifend nulla. Maecenas at nulla dictum, accumsan dolor in, euismod felis. Morbi rhoncus a ligula nec venenatis.'
-    str2 = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. In ut vehicula lacus, quis eleifend nulla. Maecenas at nulla dictum, accumsan dolor in, euismod felis. Integer sollicitudin arcu sit amet ullamcorper iaculis. Nulla.'
+    crawler_output_files = [os.path.join('out', 'lyrics_pickle_output_vagalume_0'),
+                            os.path.join('out', 'lyrics_pickle_output_letras'),
+                            os.path.join('out', 'lyrics_pickle_output_cifraclub'),
+                            os.path.join('out', 'lyrics_pickle_output_musica'),
+                            os.path.join('out', 'lyrics_pickle_output_letrasdemusicas')]
+    lyrics_by_site = []
+    for out_path in crawler_output_files:
+        if not os.path.exists(out_path):
+            continue
+        with open(out_path, 'rb') as file_in:
+            lyrics = pickle.load(file_in)
+            lyrics_by_site.extend(lyrics)
+    print('Number of lyrics: {}'.format(len(lyrics_by_site)))
 
-    sd1, sd2 = build_shingle_list(str1), build_shingle_list(str2)
-    mhash1, mhash2 = build_minhash(sd1), build_minhash(sd2)
-    print('Shingles = {}\nEstimated cardinality = {}\nByte size = {} bytes\n\n'.format(sd1, mhash1.count(), mhash1.bytesize()))
-    print('Shingles = {}\nEstimated cardinality = {}\nByte size = {} bytes\n\n'.format(sd2, mhash2.count(), mhash2.bytesize()))
-    print('Estimated Jaccard similarity = {}'.format(mhash1.jaccard(mhash2)))
-
-    set1 = set(sd1)
-    set2 = set(sd2)
-
-    jc = float(len(set1.intersection(set2)))/float(len(set1.union(set2)))
-    print('Real Jaccard similarity = {}'.format(jc))
+    #ascii_chars_prog = re.compile('[' + string.whitespace + string.punctuation + '\n' + ']')
+    for lindex, lyrics in enumerate(lyrics_by_site):
+        print('Processing song {} - {}'.format(lindex, lyrics[2]))
+        if len(lyrics[3]) == 0:
+            continue
+        shingle_list = build_shingle_list(lyrics[3])#, regex_prog=ascii_chars_prog)
+        if len(shingle_list) == 0:
+            continue
+        minhash = build_minhash(shingle_list)
