@@ -14,7 +14,14 @@ from datasketch import MinHash, MinHashLSH
 #      list_shingles = build_shingles(song)
 #      song_minhash = build_minhash(list_shingles)
 #      update_lsh(song_minhash)
+#  For all buckets in lsh:
+#   if len(bucket) > 1:
+#    songs = get_songs_from_bucket
+#    songs.class = 'duplicates'
 
+#Tasks:
+# Artist name normalization function (replace special characters by spaces. Replace quotes by nothing).
+# Pre-process the songs lyrics to remove special characters.
 
 
 def build_shingle_list(input_str, ngram_size=3, regex_prog=None):
@@ -71,16 +78,14 @@ def build_minhash(shingle_list, num_perm=128):
     return mhash
 
 
-def build_minhash_lsh(minhash_list):
-    pass
-
-
 if __name__ == '__main__':
     crawler_output_files = [os.path.join('out', 'lyrics_pickle_output_vagalume_0'),
                             os.path.join('out', 'lyrics_pickle_output_letras'),
                             os.path.join('out', 'lyrics_pickle_output_cifraclub'),
                             os.path.join('out', 'lyrics_pickle_output_musica'),
                             os.path.join('out', 'lyrics_pickle_output_letrasdemusicas')]
+
+    minhash_lsh = MinHashLSH(threshold=0.5)
     lyrics_by_site = []
     for out_path in crawler_output_files:
         if not os.path.exists(out_path):
@@ -91,11 +96,22 @@ if __name__ == '__main__':
     print('Number of lyrics: {}'.format(len(lyrics_by_site)))
 
     #ascii_chars_prog = re.compile('[' + string.whitespace + string.punctuation + '\n' + ']')
-    for lindex, lyrics in enumerate(lyrics_by_site):
-        print('Processing song {} - {}'.format(lindex, lyrics[2]))
+    for lyric_index, lyrics in enumerate(lyrics_by_site):
+        if lyric_index > 2000:
+            break
+        print('Processed {}/{} songs.\n'.format(lyric_index, len(lyrics_by_site)))
         if len(lyrics[3]) == 0:
             continue
         shingle_list = build_shingle_list(lyrics[3])#, regex_prog=ascii_chars_prog)
         if len(shingle_list) == 0:
             continue
         minhash = build_minhash(shingle_list)
+        key = lyrics[0] + '|' + lyrics[1] + '|' + lyrics[2]
+        minhash_lsh.insert(key, minhash)
+
+    possible_duplicates = []
+    for bucket in minhash_lsh.hashtables:
+        total_count += len(bucket.values())
+        for elem in bucket.values():
+            if len(elem) > 1:
+                possible_duplicates.append(elem)
