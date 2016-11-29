@@ -107,42 +107,52 @@ if __name__ == '__main__':
                             os.path.join('out', 'lyrics_pickle_output_letrasdemusicas')]
 
     ## Reading the datasets.
-    lyrics_by_site = []
+    lyrics_dict = {}
     for out_path in crawler_output_files:
         ## For each website, we load the list of song tuples
         ## (website, artist-name, song-name, song-lyrics), normalize the artist
-        ## name and song lyrics, and then we add the resulting songs to the
-        ## dataset again.
+        ## name and both song name and lyrics, and then we add the resulting
+        ## lyrics to a dictionary indexed by the song name, whici is in a
+        ## dictionary indexed by artist, which is in a dictionary indexed by the
+        ## website.
         if not os.path.exists(out_path):
             continue
         with open(out_path, 'rb') as file_in:
             lyrics_tuples_list = pickle.load(file_in)
+            website_dict = {}
             for song_idx, song in enumerate(lyrics_tuples_list):
-                if len(song[3]) == 0:
+                ## If the any song field lyrics is empty, we jump to the next
+                ## iteration.
+                if all([len(s) for s in song]) is False:
                     continue
-                song = list(song)
-                song[1] = normalize_string(song[1])
-                song[3] = normalize_string(song[3])
-                lyrics_tuples_list[song_idx] = tuple(song)
+                artist = normalize_string(song[1])
+                song_name = normalize_string(song[2])
+                lyrics = normalize_string(song[3])
+                if artist not in website_dict:
+                    website_dict[artist] = {}
+                website_dict[artist][song_name] = lyrics
 
-            lyrics_by_site.extend(lyrics_tuples_list)
+            lyrics_dict[lyrics_tuples_list[0][0]] = website_dict
 
-    print('Number of song lyrics: {}'.format(len(lyrics_by_site)))
+    print('Number of websites: {}'.format(len(lyrics_dict)))
+    print('Number of song lyrics: {}'.format(sum([len(artist)
+                                                  for website in lyrics_dict.values()
+                                                  for artist in website.values()])))
 
     mhash_lsh = MinHashLSH(threshold=0.5)
-    for lyric_idx, lyrics in enumerate(lyrics_by_site):
+    #for lyric_idx, lyrics in enumerate(lyrics_by_site):
         ## TODO(gschardong): Remove this after thorough testing.
-        if lyric_idx > 2000:
-            break
-        print('Processed {}/{} songs.'.format(lyric_idx, len(lyrics_by_site)))
-        if len(lyrics[3]) == 0:
-            continue
-        shingle_list = build_shingle_list(lyrics[3])
-        if len(shingle_list) == 0:
-            continue
-        mhash = build_minhash(shingle_list)
-        key = lyrics[0] + '|' + lyrics[1] + '|' + lyrics[2]
-        mhash_lsh.insert(key, mhash)
+    #    if lyric_idx > 2000:
+    #        break
+    #    print('Processed {}/{} songs.'.format(lyric_idx, len(lyrics_by_site)))
+    #    if len(lyrics[3]) == 0:
+    #        continue
+    #    shingle_list = build_shingle_list(lyrics[3])
+    #    if len(shingle_list) == 0:
+    #        continue
+    #    mhash = build_minhash(shingle_list)
+    #    key = lyrics[0] + '|' + lyrics[1] + '|' + lyrics[2]
+    #    mhash_lsh.insert(key, mhash)
 
     possible_duplicates = []
     for bucket in mhash_lsh.hashtables:
