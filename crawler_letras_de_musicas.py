@@ -63,7 +63,10 @@ def crawl_letras():
 
         soup = BeautifulSoup(lyrics_html, 'html.parser')
         lyrics_tags = soup.find_all(is_lyrics)
-        string_inside = str(lyrics_tags[0])
+        try:
+            string_inside = str(lyrics_tags[0])
+        except IndexError:
+            return ''
         string_inside = string_inside[string_inside.find(">") + 1: string_inside.rfind('</')]
         clean_string_inside = '\n'.join(string_inside.split('<br/>'))
         return clean_string_inside
