@@ -16,14 +16,11 @@ from datasketch import MinHash, MinHashLSH
 #      song_minhash = build_minhash(list_shingles)
 #      update_lsh(song_minhash)
 #  For all buckets in lsh:
-#   if len(bucket) > 1:
-#    songs = get_songs_from_bucket
-#    songs.class = 'duplicates'
-
-#Tasks:
-# Artist name normalization function (replace special characters by spaces. Replace quotes by nothing).
-# Pre-process the songs lyrics to remove special characters before building the shingles.
-
+#   For each element in a bucket:
+#    if len(element) > 1:
+#     we have a possible duplicate. Parse the song's keys and retrieve the
+#     lyrics from the main data structure for further comparison using edit
+#     distance.
 
 def build_shingle_list(input_str, ngram_size=3):
     """
