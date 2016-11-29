@@ -103,19 +103,19 @@ def normalize_dataset(song_list):
 
 def build_train_test_sets(song_list, train_proportion):
     """
-    Given a list of songs, and a list fo train/test proportions, this function
-    selects uniformly at random which songs will compose the train and test
-    datasets using the given proportions.
+    Given a list of songs and a proportion of training elements, this functions
+    selects uniformly at random which songs will compose the training and test
+    datasets.
 
     Arguments:
     song_list -- A list of songs. Each song is a tuple of
     (website, artist-name, song-name and song-lyrics).
-    props_tuple -- A tuple containing the train and test proportions. These
-    values must add to 1.
+    train_proporion -- The percentage of elements to assign to the training set.
+    This value must be in range (0, 1)
 
     Returns:
-    A list containing two sublists. The first list contains the training set,
-    the second contains the test set.
+    Two lists, the first contains the training set, and the second contains the
+    test set.
     """
     if not song_list or len(song_list) == 0:
         raise ValueError('Invalid list of songs.')
