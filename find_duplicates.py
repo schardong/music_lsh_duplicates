@@ -112,6 +112,31 @@ def build_train_validation_datasets(song_list, train_proportion=0.5):
     return train_set, validation_set
 
 
+def is_same_string(string_a, string_b, char_margin=5):
+    """
+    Given two strings, this function returns True if they are identical within
+    a certain tolerance. This functions uses the edit distance to compare the
+    inputs.
+
+    Arguments:
+    string_a -- The first string
+    string_b -- The second string
+    char_margin -- The number of characters to use as margin.
+
+    Returns:
+    True if string_a matches string_b with at most "char_margin" different
+    characters. Also returns the distance between the two strings.
+    """
+    if not string_a or len(string_a) == 0:
+        raise ValueError('Invalid input string.')
+    if not string_b or len(string_b) == 0:
+        raise ValueError('Invalid input string.')
+    if len(string_a) < char_margin or len(string_b) < char_margin:
+        raise ValueError('Input strings shorter than tolerance margin.')
+
+    d = editdistance.eval(string_a, string_b)
+    return d < char_margin, d
+
 def main():
     """
     Main function. This function loads the training dataset, splits it into
@@ -212,6 +237,9 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+
 #-------------------------------------------------------------------------------
 def old_content():
     ## Reading the datasets if needed.
