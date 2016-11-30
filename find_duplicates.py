@@ -178,7 +178,10 @@ def is_same_string(string_a, string_b, char_margin=5):
     Arguments:
     string_a -- The first string
     string_b -- The second string
-    char_margin -- The number of characters to use as margin.
+    char_margin -- The number or percentage of characters to use as margin. If
+    this parameter is float, it will be interpreted as a percentage of characters
+    of the smallest string. If is of type int, then it will be interpreted as the
+    number of characters of tolerance to declare that the two strings are the same.
 
     Returns:
     True if string_a matches string_b with at most "char_margin" different
@@ -188,11 +191,17 @@ def is_same_string(string_a, string_b, char_margin=5):
         raise ValueError('Invalid input string.')
     if not string_b or len(string_b) == 0:
         raise ValueError('Invalid input string.')
-    if len(string_a) < char_margin or len(string_b) < char_margin:
-        raise ValueError('Input strings shorter than tolerance margin.')
+    if isinstance(char_margin, int):
+        if len(string_a) < char_margin or len(string_b) < char_margin:
+            raise ValueError('Input strings shorter than tolerance margin.')
 
     d = editdistance.eval(string_a, string_b)
-    return d < char_margin, d
+
+    if isinstance(char_margin, float):
+        shortest_str_len = len(string_a) if len(string_a) < len(string_b) else len(string_b)
+        return (False if float(d) / float(shortest_str_len) > char_margin else True), d
+    else:
+        return d < char_margin, d
 
 
 if __name__ == '__main__':
@@ -220,11 +229,7 @@ if __name__ == '__main__':
                      num_perm=NUM_PERMUTATIONS)
 
     start_time = timeit.default_timer()
-    for song_idx, song in enumerate(train_dataset):
-        ## TODO(gschardong): Remove this after testing
-        if song_idx > 20000:
-            break
-        
+    for song_idx, song in enumerate(train_dataset):        
         lyrics = song[3]
         if len(lyrics) == 0:
             continue
@@ -239,13 +244,14 @@ if __name__ == '__main__':
             lsh.insert(mhash_k, mhash)
         except ValueError:
             ## This error occurs if there is a song with the same name in the hash.
-            print('Key = {}'.format(mhash_k))
+            print('Repeated Key = {}'.format(mhash_k))
 
     end_time = timeit.default_timer()
     lsh_build_time = end_time - start_time
 
     ## Getting the keys of the possible duplicates.
     possible_duplicates = get_possible_duplicates(lsh)
+    num_possible_duplicates = sum([len(v) for v in possible_duplicates])
 
     ## Building the website,artist,song_name dict to easily retrieve the lyrics.
     lyrics_dict = build_lyrics_dict(train_dataset)
@@ -267,10 +273,10 @@ if __name__ == '__main__':
                 lyrics_b = lyrics_dict[site_b][artist_b][song_b]
 
                 try:
-                    if is_same_string(lyrics_a, lyrics_b, 10):
+                    if is_same_string(lyrics_a, lyrics_b, 0.1):
                         num_duplicates += 1
                 except ValueError:
-                    print('{}'.format(dups[next_idx]))
+                    print('Lyrics too short: {}'.format(dups[next_idx]))
 
     end_time = timeit.default_timer()
     dup_check_time = end_time - start_time
@@ -282,7 +288,7 @@ if __name__ == '__main__':
                          str(lsh.threshold),
                          str(lsh_build_time),
                          str(dup_check_time),
-                         'NA',
+                         str(num_duplicates / num_possible_duplicates),
                          'NA'])
 
     if not os.path.exists(BENCHMARK_FILE):
