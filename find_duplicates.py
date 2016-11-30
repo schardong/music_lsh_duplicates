@@ -112,6 +112,63 @@ def build_train_validation_datasets(song_list, train_proportion=0.5):
     return train_set, validation_set
 
 
+def build_lyrics_dict(lyrics_list):
+    """
+    Given a list of tuples, this function builds a triple nested dictionary
+    indexed by the website, artist and song-name, with each lyric as the mapped
+    data.
+
+    Arguments:
+    lyrics_list -- List of tuples in the form
+    (website, artist-name, song-name, song-lyrics).
+
+    Returns:
+    A dictionary indexed by the website, artist and song name. The songs will be
+    stored under each song name dict.
+    """
+    if not lyrics_list or len(lyrics_list) == 0:
+        raise ValueError('Invalid lyrics list.')
+
+    lyrics_dict = {}
+    for song in train_dataset:
+        website = song[0]
+        artist = song[1]
+        song_name = song[2]
+
+        if website not in lyrics_dict:
+            lyrics_dict[website] = {}
+        if artist not in lyrics_dict[website]:
+            lyrics_dict[website][artist] = defaultdict(dict)
+
+        lyrics_dict[website][artist][song_name] = song[3]
+
+    return lyrics_dict
+
+
+def get_possible_duplicates(lsh_index):
+    """
+    Given an LSH index, this function iterates through the buckets of the index
+    and retrieves a list of possible duplicates.
+
+    Arguments:
+    lsh_index -- The LSH index structure.
+
+    Returns:
+    A list of lists, where each sublist contains the keys of the possible
+    duplicates stored in the LSH hash.
+    """
+    if not lsh_index:
+        raise ValueError('Invalid LSH index.')
+
+    possible_duplicates = []
+    for bucket in lsh.hashtables:
+        for elem in bucket.values():
+            if len(elem) > 1:
+                possible_duplicates.append(elem)
+
+    return possible_duplicates
+
+
 def is_same_string(string_a, string_b, char_margin=5):
     """
     Given two strings, this function returns True if they are identical within
@@ -137,7 +194,8 @@ def is_same_string(string_a, string_b, char_margin=5):
     d = editdistance.eval(string_a, string_b)
     return d < char_margin, d
 
-def main():
+
+if __name__ == '__main__':
     """
     Main function. This function loads the training dataset, splits it into
     training and validation datasets and runs the LSH algorithm with the given
@@ -148,11 +206,9 @@ def main():
     algorithm is applied. The algorithm's performance with both sets if compared
     for inconsistensies.
     """
-    train_set_file = os.path.join('out', 'train_set_pickle')
-
     ## Reading the traning dataset.
     train_dataset = []
-    with open(train_set_file, 'rb') as train_set_in:
+    with open(os.path.join('out', 'train_set_pickle'), 'rb') as train_set_in:
         train_dataset = pickle.load(train_set_in)
 
     ## Aproximately 20% of the original set will be used as validation for the training.
@@ -162,11 +218,17 @@ def main():
     ## Building the LSH index.
     lsh = MinHashLSH(threshold=LSH_THRESHOLD,
                      num_perm=NUM_PERMUTATIONS)
+
     start_time = timeit.default_timer()
-    for song in train_dataset:
+    for song_idx, song in enumerate(train_dataset):
+        ## TODO(gschardong): Remove this after testing
+        if song_idx > 20000:
+            break
+        
         lyrics = song[3]
         if len(lyrics) == 0:
             continue
+        
         shingle_list = build_shingle_list(lyrics, ngram_size=SHINGLE_SIZE)
         if len(shingle_list) == 0:
             continue
@@ -176,45 +238,50 @@ def main():
         try:
             lsh.insert(mhash_k, mhash)
         except ValueError:
+            ## This error occurs if there is a song with the same name in the hash.
             print('Key = {}'.format(mhash_k))
 
     end_time = timeit.default_timer()
+    lsh_build_time = end_time - start_time
 
     ## Getting the keys of the possible duplicates.
-    possible_duplicates = []
-    for bucket in lsh.hashtables:
-        for elem in bucket.values():
-            if len(elem) > 1:
-                possible_duplicates.append(elem)
+    possible_duplicates = get_possible_duplicates(lsh)
 
     ## Building the website,artist,song_name dict to easily retrieve the lyrics.
-    lyrics_dict = {}
-    for song in train_dataset:
-        website = song[0]
-        artist = song[1]
-        song_name = song[2]
+    lyrics_dict = build_lyrics_dict(train_dataset)
 
-        if website not in lyrics_dict:
-            lyrics_dict[website] = {}
-        if artist not in lyrics_dict[website]:
-            lyrics_dict[website][artist] = defaultdict(dict)
+    ## Comparing the possible duplicates.
+    num_duplicates = 0
+    start_time = timeit.default_timer()
+    for dups in possible_duplicates:
+        for idx, key in enumerate(dups):
+            site_a, artist_a, song_a = key.split('|')
+            lyrics_a = lyrics_dict[site_a][artist_a][song_a]
 
-        lyrics_dict[website][artist][song_name] = song[3]
+            for next_idx in range(idx+1, len(dups)):
+                site_b, artist_b, song_b = dups[next_idx].split('|')
 
-    #for dups in possible_duplicates:
-    #    must_compare_keys = []
-    #    for key in dups:
-    #        website, artist, song_name = key.split('|')
-    #        must_compare_keys.append([website, artist, song_name])
+                ## If the artists are different, we don't compare the lyrics.
+                if not is_same_string(artist_a, artist_b, char_margin=1):
+                    continue
+                lyrics_b = lyrics_dict[site_b][artist_b][song_b]
 
+                try:
+                    if is_same_string(lyrics_a, lyrics_b, 10):
+                        num_duplicates += 1
+                except ValueError:
+                    print('{}'.format(dups[next_idx]))
+
+    end_time = timeit.default_timer()
+    dup_check_time = end_time - start_time
 
     ## Writing the general benchmark results.
     file_row = ','.join([str(SHINGLE_SIZE),
                          str(lsh.b),
                          str(lsh.r),
                          str(lsh.threshold),
-                         str(end_time - start_time),
-                         'NA',
+                         str(lsh_build_time),
+                         str(dup_check_time),
                          'NA',
                          'NA'])
 
@@ -225,7 +292,7 @@ def main():
                       'Rows.Per.Band',
                       'Threshold',
                       'Time.LSH.Build',
-                      'Time.Dedup',
+                      'Time.Check.Dups',
                       'Precision',
                       'Recall']
             file_out.write(','.join(header) + '\n')
@@ -235,8 +302,8 @@ def main():
             file_out.write(file_row)
 
 
-if __name__ == '__main__':
-    main()
+#if __name__ == '__main__':
+#    main()
 
 
 
