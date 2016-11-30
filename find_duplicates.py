@@ -1,9 +1,8 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
-import re
 import os
-import string
+import sys
 import pickle
 import timeit
 import editdistance
@@ -113,7 +112,17 @@ def build_train_validation_datasets(song_list, train_proportion=0.5):
     return train_set, validation_set
 
 
-if __name__ == '__main__':
+def main():
+    """
+    Main function. This function loads the training dataset, splits it into
+    training and validation datasets and runs the LSH algorithm with the given
+    parameters on the tranining dataset. Later, the parameters are tested using
+    the validation dataset.
+
+    After the parameters are adjusted, the test dataset is loaded and the same
+    algorithm is applied. The algorithm's performance with both sets if compared
+    for inconsistensies.
+    """
     train_set_file = os.path.join('out', 'train_set_pickle')
 
     ## Reading the traning dataset.
@@ -123,7 +132,7 @@ if __name__ == '__main__':
 
     ## Aproximately 20% of the original set will be used as validation for the training.
     ## This ammounts to 14% of the training set.
-    train_dataset, validation_dataset = build_train_validation_datasets(train_dataset, 0.86)
+    train_dataset, _ = build_train_validation_datasets(train_dataset, 0.86)
 
     ## Building the LSH index.
     lsh = MinHashLSH(threshold=LSH_THRESHOLD,
@@ -133,7 +142,7 @@ if __name__ == '__main__':
         lyrics = song[3]
         if len(lyrics) == 0:
             continue
-        shingle_list = build_shingle_list(lyrics, ngram_size = SHINGLE_SIZE)
+        shingle_list = build_shingle_list(lyrics, ngram_size=SHINGLE_SIZE)
         if len(shingle_list) == 0:
             continue
 
@@ -172,34 +181,37 @@ if __name__ == '__main__':
     #    for key in dups:
     #        website, artist, song_name = key.split('|')
     #        must_compare_keys.append([website, artist, song_name])
-        
-    
+
+
     ## Writing the general benchmark results.
-    #file_row = ','.join([str(SHINGLE_SIZE),
-    #                     str(lsh.b),
-    #                     str(lsh.r),
-    #                     str(lsh.threshold),
-    #                     str(end_time - start_time),
-    #                     'NA',
-    #                     'NA',
-    #                     'NA'])
+    file_row = ','.join([str(SHINGLE_SIZE),
+                         str(lsh.b),
+                         str(lsh.r),
+                         str(lsh.threshold),
+                         str(end_time - start_time),
+                         'NA',
+                         'NA',
+                         'NA'])
 
-    #if not os.path.exists(BENCHMARK_FILE):
-    #    with open(BENCHMARK_FILE, 'a+') as file_out:
-    #        header = ['Shingle.Size',
-    #                  'Num.Bands',
-    #                  'Rows.Per.Band',
-    #                  'Threshold',
-    #                  'Time.LSH.Build',
-    #                  'Time.Dedup',
-    #                  'Precision',
-    #                  'Recall']
-    #        file_out.write(','.join(header) + '\n')
-    #        file_out.write(file_row)
-    #else:
-    #    with open(BENCHMARK_FILE, 'a+') as file_out:
-    #        file_out.write(file_row)
+    if not os.path.exists(BENCHMARK_FILE):
+        with open(BENCHMARK_FILE, 'a+') as file_out:
+            header = ['Shingle.Size',
+                      'Num.Bands',
+                      'Rows.Per.Band',
+                      'Threshold',
+                      'Time.LSH.Build',
+                      'Time.Dedup',
+                      'Precision',
+                      'Recall']
+            file_out.write(','.join(header) + '\n')
+            file_out.write(file_row)
+    else:
+        with open(BENCHMARK_FILE, 'a+') as file_out:
+            file_out.write(file_row)
 
+
+if __name__ == '__main__':
+    main()
 #-------------------------------------------------------------------------------
 def old_content():
     ## Reading the datasets if needed.
