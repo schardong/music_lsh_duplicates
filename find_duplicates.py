@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 import os
-import sys
 import pickle
 import timeit
 import editdistance
@@ -130,7 +129,7 @@ def build_lyrics_dict(lyrics_list):
         raise ValueError('Invalid lyrics list.')
 
     lyrics_dict = {}
-    for song in train_dataset:
+    for song in lyrics_list:
         website = song[0]
         artist = song[1]
         song_name = song[2]
@@ -161,7 +160,7 @@ def get_possible_duplicates(lsh_index):
         raise ValueError('Invalid LSH index.')
 
     possible_duplicates = []
-    for bucket in lsh.hashtables:
+    for bucket in lsh_index.hashtables:
         for elem in bucket.values():
             if len(elem) > 1:
                 possible_duplicates.append(elem)
@@ -204,7 +203,7 @@ def is_same_string(string_a, string_b, char_margin=5):
         return d < char_margin, d
 
 
-if __name__ == '__main__':
+def main():
     """
     Main function. This function loads the training dataset, splits it into
     training and validation datasets and runs the LSH algorithm with the given
@@ -229,11 +228,11 @@ if __name__ == '__main__':
                      num_perm=NUM_PERMUTATIONS)
 
     start_time = timeit.default_timer()
-    for song_idx, song in enumerate(train_dataset):        
+    for song in train_dataset:
         lyrics = song[3]
         if len(lyrics) == 0:
             continue
-        
+
         shingle_list = build_shingle_list(lyrics, ngram_size=SHINGLE_SIZE)
         if len(shingle_list) == 0:
             continue
@@ -308,65 +307,5 @@ if __name__ == '__main__':
             file_out.write(file_row)
 
 
-#if __name__ == '__main__':
-#    main()
-
-
-
-#-------------------------------------------------------------------------------
-def old_content():
-    ## Reading the datasets if needed.
-    if lyrics_dict is None:
-        print('Reading the datasets.')
-        lyrics_dict = {}
-        for out_path in crawler_output_files:
-            ## For each website, we load the list of song tuples
-            ## (website, artist-name, song-name, song-lyrics), normalize the artist
-            ## name and both song name and lyrics, and then we add the resulting
-            ## lyrics to a dictionary indexed by the song name, which is in a
-            ## dictionary indexed by artist, which is in a dictionary indexed by the
-            ## website.
-            print('Trying to read {}'.format(out_path))
-            if not os.path.exists(out_path):
-                continue
-            with open(out_path, 'rb') as file_in:
-                lyrics_tuples_list = pickle.load(file_in)
-                website_dict = defaultdict(dict)
-                for song in lyrics_tuples_list:
-                    ## If the any song field lyrics is empty, we jump to the next
-                    ## iteration.
-                    if all([len(s) for s in song]) is False:
-                        continue
-                    artist = normalize_string(song[1])
-                    song_name = normalize_string(song[2])
-                    lyrics = normalize_string(song[3])
-                    website_dict[artist][song_name] = lyrics
-
-
-                    lyrics_dict[lyrics_tuples_list[0][0]] = website_dict
-
-    print('Number of websites: {}'.format(len(lyrics_dict)))
-    print('Number of song lyrics in database: {}'.format(sum([len(artist)
-                                                              for website in lyrics_dict.values()
-                                                              for artist in website.values()])))
-
-    ## Building the MinHashLSH index.
-    mhash_lsh = MinHashLSH(threshold=0.1)
-    website_time_dict = {}
-    start_time = timeit.default_timer()
-    for website_name, website in lyrics_dict.items():
-        print('Processing website {}. Number of artists: {}'.format(website_name, len(website.keys())))
-        website_start_time = timeit.default_timer()
-        for artist_name, artist in website.items():
-            for lyric_name, lyric in artist.items():
-                if len(lyric) == 0:
-                    continue
-                shingle_list = build_shingle_list(lyric, ngram_size = SHINGLE_SIZE)
-                if len(shingle_list) == 0:
-                    continue
-                mhash = build_minhash(shingle_list)
-                mhash_key = website_name + '|' + artist_name + '|' + lyric_name
-                mhash_lsh.insert(mhash_key, mhash)
-        website_end_time = timeit.default_timer();
-        website_time_dict[website_name] = website_end_time - website_start_time
-    end_time = timeit.default_timer()
+if __name__ == '__main__':
+    main()
