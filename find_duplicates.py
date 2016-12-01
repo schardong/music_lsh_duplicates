@@ -250,7 +250,7 @@ def main():
 
     ## Getting the keys of the possible duplicates.
     possible_duplicates = get_possible_duplicates(lsh)
-    num_possible_duplicates = sum([len(v) for v in possible_duplicates])
+    num_possible_duplicates = sum((len(v) - 1) * len(v) / 2 for v in possible_duplicates)
 
     ## Building the website,artist,song_name dict to easily retrieve the lyrics.
     lyrics_dict = build_lyrics_dict(train_dataset)
@@ -272,7 +272,8 @@ def main():
                 lyrics_b = lyrics_dict[site_b][artist_b][song_b]
 
                 try:
-                    if is_same_string(lyrics_a, lyrics_b, 0.1):
+                    same, _ = is_same_string(lyrics_a, lyrics_b, 0.1)
+                    if same:
                         num_duplicates += 1
                 except ValueError:
                     print('Lyrics too short: {}'.format(dups[next_idx]))
@@ -291,7 +292,7 @@ def main():
                          'NA'])
 
     if not os.path.exists(BENCHMARK_FILE):
-        with open(BENCHMARK_FILE, 'a+') as file_out:
+        with open(BENCHMARK_FILE, 'w') as file_out:
             header = ['Shingle.Size',
                       'Num.Bands',
                       'Rows.Per.Band',
@@ -300,11 +301,11 @@ def main():
                       'Time.Check.Dups',
                       'Precision',
                       'Recall']
-            file_out.write(','.join(header) + '\n')
-            file_out.write(file_row)
+            print(','.join(header), file=file_out)
+            print(file_row, file=file_out)
     else:
         with open(BENCHMARK_FILE, 'a+') as file_out:
-            file_out.write(file_row)
+            print(file_row, file=file_out)
 
 
 if __name__ == '__main__':

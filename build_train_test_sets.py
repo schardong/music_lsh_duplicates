@@ -15,7 +15,7 @@ import numpy as np
 
 OUTPUT_TRAIN_DATASET_FILE = os.path.join('out', 'train_set_pickle')
 OUTPUT_TEST_DATASET_FILE = os.path.join('out', 'test_set_pickle')
-PICKLE_FILE_LIST = [os.path.join('out', 'lyrics_pickle_output_vagalume_0'),
+PICKLE_FILE_LIST = [os.path.join('out', 'lyrics_pickle_output_vagalume'),
                     os.path.join('out', 'lyrics_pickle_output_letras'),
                     os.path.join('out', 'lyrics_pickle_output_musica'),
                     os.path.join('out', 'lyrics_pickle_output_letras_de_musicas')]
