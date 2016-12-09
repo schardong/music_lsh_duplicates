@@ -3,10 +3,10 @@
 
 import os
 import pickle
-import timeit
 import editdistance
 import numpy as np
 from collections import defaultdict
+from multiprocessing import Process
 from datasketch import MinHash, MinHashLSH
 
 # Algorithm outline:
@@ -23,11 +23,12 @@ from datasketch import MinHash, MinHashLSH
 #     lyrics from the main data structure for further comparison using edit
 #     distance.
 
-SHINGLE_SIZE = 5
-LSH_THRESHOLD = 0.5
-NUM_PERMUTATIONS = 128
+SHINGLE_SIZES = [5, 7, 10]
+LSH_THRESHOLDS = [0.1, 0.3, 0.5, 0.7, 0.9]
+NUM_PERMUTATIONS = [64, 128, 256]
 BENCHMARK_FILE = os.path.join('out', 'output_lsh_benchmarks.csv')
 WEBSITE_BENCHMARK_FILE = os.path.join('out', 'output_website_benchmarks.csv')
+TRAIN_DATASET_FILE = os.path.join('out', 'train_set_pickle')
 
 def build_shingle_list(input_str, ngram_size=3):
     """
@@ -203,7 +204,7 @@ def is_same_string(string_a, string_b, char_margin=5):
         return d < char_margin, d
 
 
-def main():
+def run(shingle_size, num_permutations, lsh_threshold):
     """
     Main function. This function loads the training dataset, splits it into
     training and validation datasets and runs the LSH algorithm with the given
@@ -215,98 +216,53 @@ def main():
     for inconsistensies.
     """
     ## Reading the traning dataset.
-    train_dataset = []
-    with open(os.path.join('out', 'train_set_pickle'), 'rb') as train_set_in:
+    train_dataset = {}
+    with open(TRAIN_DATASET_FILE, 'rb') as train_set_in:
         train_dataset = pickle.load(train_set_in)
 
-    ## Aproximately 20% of the original set will be used as validation for the training.
-    ## This ammounts to 14% of the training set.
-    train_dataset, _ = build_train_validation_datasets(train_dataset, 0.86)
-
     ## Building the LSH index.
-    lsh = MinHashLSH(threshold=LSH_THRESHOLD,
-                     num_perm=NUM_PERMUTATIONS)
+    lsh = MinHashLSH(threshold=lsh_threshold,
+                     num_perm=num_permutations)
 
-    start_time = timeit.default_timer()
-    for song in train_dataset:
-        lyrics = song[3]
+    for key, lyrics in train_dataset.items():
         if len(lyrics) == 0:
             continue
 
-        shingle_list = build_shingle_list(lyrics, ngram_size=SHINGLE_SIZE)
+        shingle_list = build_shingle_list(lyrics, ngram_size=shingle_size)
         if len(shingle_list) == 0:
             continue
 
-        mhash = build_minhash(shingle_list, num_perm=NUM_PERMUTATIONS)
-        mhash_k = song[0] + '|' + song[1] + '|' + song[2]
+        mhash = build_minhash(shingle_list, num_perm=num_permutations)
         try:
-            lsh.insert(mhash_k, mhash)
+            lsh.insert(key, mhash)
         except ValueError:
             ## This error occurs if there is a song with the same name in the hash.
-            print('Repeated Key = {}'.format(mhash_k))
-
-    end_time = timeit.default_timer()
-    lsh_build_time = end_time - start_time
+            print('Repeated Key = {}'.format(key))
 
     ## Getting the keys of the possible duplicates.
     possible_duplicates = get_possible_duplicates(lsh)
-    num_possible_duplicates = sum((len(v) - 1) * len(v) / 2 for v in possible_duplicates)
 
-    ## Building the website,artist,song_name dict to easily retrieve the lyrics.
-    lyrics_dict = build_lyrics_dict(train_dataset)
-
-    ## Comparing the possible duplicates.
-    num_duplicates = 0
-    start_time = timeit.default_timer()
+    possible_duplicates_comb = []
     for dups in possible_duplicates:
         for idx, key in enumerate(dups):
-            site_a, artist_a, song_a = key.split('|')
-            lyrics_a = lyrics_dict[site_a][artist_a][song_a]
-
             for next_idx in range(idx+1, len(dups)):
-                site_b, artist_b, song_b = dups[next_idx].split('|')
+                curr_comb = [key, dups[next_idx]]
+                possible_duplicates_comb.append(curr_comb)
 
-                ## If the artists are different, we don't compare the lyrics.
-                if not is_same_string(artist_a, artist_b, char_margin=1):
-                    continue
-                lyrics_b = lyrics_dict[site_b][artist_b][song_b]
-
-                try:
-                    same, _ = is_same_string(lyrics_a, lyrics_b, 0.1)
-                    if same:
-                        num_duplicates += 1
-                except ValueError:
-                    print('Lyrics too short: {}'.format(dups[next_idx]))
-
-    end_time = timeit.default_timer()
-    dup_check_time = end_time - start_time
-
-    ## Writing the general benchmark results.
-    file_row = ','.join([str(SHINGLE_SIZE),
-                         str(lsh.b),
-                         str(lsh.r),
-                         str(lsh.threshold),
-                         str(lsh_build_time),
-                         str(dup_check_time),
-                         str(num_duplicates / num_possible_duplicates),
-                         'NA'])
-
-    if not os.path.exists(BENCHMARK_FILE):
-        with open(BENCHMARK_FILE, 'w') as file_out:
-            header = ['Shingle.Size',
-                      'Num.Bands',
-                      'Rows.Per.Band',
-                      'Threshold',
-                      'Time.LSH.Build',
-                      'Time.Check.Dups',
-                      'Precision',
-                      'Recall']
-            print(','.join(header), file=file_out)
-            print(file_row, file=file_out)
-    else:
-        with open(BENCHMARK_FILE, 'a+') as file_out:
-            print(file_row, file=file_out)
+    duplicates_filename = 'b-{}_r-{}_shinglesize-{}_numperp-{}_thresh-{}'.format(lsh.b, lsh.r, shingle_size, num_permutations, lsh_threshold)
+    pickle.dump(possible_duplicates_comb, open(duplicates_filename, 'wb'))
 
 
 if __name__ == '__main__':
-    main()
+    process_pool = []
+
+    for curr_shingle_size in SHINGLE_SIZES:
+        for curr_num_perm in NUM_PERMUTATIONS:
+            for curr_threshold in LSH_THRESHOLDS:
+                p = Process(target=run, args=(curr_shingle_size, curr_num_perm, curr_threshold))
+                process_pool.append(p)
+                p.start()
+
+    for p in process_pool:
+        p.join()
+

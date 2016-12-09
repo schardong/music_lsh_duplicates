@@ -15,93 +15,37 @@ import numpy as np
 
 OUTPUT_TRAIN_DATASET_FILE = os.path.join('out', 'train_set_pickle')
 OUTPUT_TEST_DATASET_FILE = os.path.join('out', 'test_set_pickle')
-PICKLE_FILE_LIST = [os.path.join('out', 'lyrics_pickle_output_vagalume'),
-                    os.path.join('out', 'lyrics_pickle_output_letras'),
-                    os.path.join('out', 'lyrics_pickle_output_musica'),
-                    os.path.join('out', 'lyrics_pickle_output_letras_de_musicas')]
+INPUT_PICKLE_FILE = os.path.join('out', 'lyrics_pickle_processed_dict')
 
 
-def read_pickle_files(path_list):
+def read_pickle_file(pickle_path):
     """
-    Given a list of paths to the pickle files, this function reads each one of
-    them and returns a list of tuples, where each tuple is of the form
-    (website, artist-name, song-name, song-lyrics), where all fields are strings.
+    Given a path to the pre-processed pickle file, this function reads the data
+    contained in it and returns the {website|artist|song-name, song-lyrics}
+    dictionary stored within.
 
     Arguments:
-    path_list -- A list containing the paths to the pickle files.
+    pickle_path -- The path to the pickle file.
 
     Returns:
-    A list of tuples with the data inside the pickle files.
+    A dictionary with the data stored inside the path given as parameter.
     """
-    if not path_list or len(path_list) == 0:
+    if not pickle_path or len(pickle_path) == 0:
         raise ValueError('Invalid path list given')
 
-    lyrics_list = []
-    for path in path_list:
-        print('Trying to read file: {}'.format(path))
-        if not os.path.exists(path):
-            print('WARNING: File {} was not found. Continuing.'.format(path))
-            continue
-        with open(path, 'rb') as file_in:
-            lyrics_tuple_list = pickle.load(file_in)
-            lyrics_list.extend(lyrics_tuple_list)
+    print('Trying to read file: {}'.format(pickle_path))
+    if not os.path.exists(pickle_path):
+        print('WARNING: File {} was not found. Continuing.'.format(pickle_path))
+        return {}
 
-    return lyrics_list
+    lyrics_tuple_list = {}
+    with open(pickle_path, 'rb') as file_in:
+        lyrics_tuple_list = pickle.load(file_in)
 
-
-def normalize_string(input_text):
-    """
-    Given an input string, this function removes all special characters and
-    returns a clean version of the original text. Any quote characters are
-    replaced by an empty string.
-
-    Arguments:
-    input_text -- The input string
-
-    Returns:
-    A cleaned-up version of the input text.
-    """
-    if input_text is None or len(input_text) == 0:
-        raise ValueError('Invalid list of song lyrics.')
-
-    tmp_text = input_text.replace('\'', '').lower()
-    normalized_text = re.sub('[' + string.punctuation + string.whitespace + ']',
-                             ' ',
-                             tmp_text)
-    normalized_text = ' '.join(normalized_text.split())
-    return normalized_text
+    return lyrics_tuple_list
 
 
-def normalize_dataset(song_list):
-    """
-    Given a list of song tuples, this function normalizes the artist name, song
-    name and song lyrics in order to remove special characters. The song tuples
-    must be in the form: (website, artist-name, song-name, song-lyrics).
-
-    Arguments:
-    song_list -- A list of songs.
-
-    Retuns:
-    A list of tuples in the same format as the input song_list, however, the
-    songs' name and lyrics, as well as the artists' names are normalized. Any
-    missing fields in a tuple will not be included in the final list.
-    """
-    if not song_list or len(song_list) == 0:
-        raise ValueError('Invalid list of songs.')
-
-    normalized_song_list = []
-    for song in song_list:
-        if all([len(s) for s in song]) is False:
-            continue
-        artist = normalize_string(song[1])
-        song_name = normalize_string(song[2])
-        lyrics = normalize_string(song[3])
-        normalized_song_list.append((song[0], artist, song_name, lyrics))
-
-    return normalized_song_list
-
-
-def build_train_test_sets(song_list, train_proportion):
+def build_train_validation_test_sets(song_list, train_proportion):
     """
     Given a list of songs and a proportion of training elements, this functions
     selects uniformly at random which songs will compose the training and test
@@ -123,14 +67,19 @@ def build_train_test_sets(song_list, train_proportion):
         raise ValueError('Invalid train set proportion. Value must be in range (0, 1)')
     
     choice = np.random.sample(len(song_list))
-    train_set = [s for i, s in enumerate(song_list) if choice[i] <= train_proportion]
-    test_set = [s for i, s in enumerate(song_list) if choice[i] > train_proportion]
+    train_set = dict([(k, s) for i, (k, s) in enumerate(song_list.items()) if choice[i] <= train_proportion])
+    test_set = dict([(k, s) for i, (k, s) in enumerate(song_list.items()) if choice[i] > train_proportion])
     return train_set, test_set
 
 if __name__ == '__main__':
     lyrics_list = read_pickle_files(PICKLE_FILE_LIST)
-    lyrics_list = normalize_dataset(lyrics_list)
+    #lyrics_list = normalize_dataset(lyrics_list)
     train_set, test_set = build_train_test_sets(lyrics_list, 0.7)
+
+    choice = np.random.sample(len(train_set))
+    new_train_set = dict([(k, s) for i, (k, s) in enumerate(train_set.items()) if choice[i] <= 0.86])
+    validation_set = dict([(k, s) for i, (k, s) in enumerate(train_set.items()) if choice[i] > 0.86])
     
-    pickle.dump(train_set, open(OUTPUT_TRAIN_DATASET_FILE, 'wb'))
+    pickle.dump(new_train_set, open(OUTPUT_TRAIN_DATASET_FILE, 'wb'))
+    pickle.dump(validation_set, open(os.path.join('out', 'validation_set_pickle'), 'wb'))
     pickle.dump(test_set, open(OUTPUT_TEST_DATASET_FILE, 'wb'))
