@@ -10,9 +10,9 @@ from bs4 import BeautifulSoup
 
 
 LYRICS = []
-OUTPUT_PICKLE_PATH = 'out/lyrics_vagalume.pickle'
+OUTPUT_PICKLE_PATH = 'out/lyrics_cifraclub.pickle'
 READ_ALL_ARTISTS = False
-CURRENT_ARTIST = 'ajay-atul'
+CURRENT_ARTIST = ''
 SAVED_CURRENT_ARTIST_LYRICS = False
 
 
@@ -21,17 +21,16 @@ def save_artist_lyrics(website_name, artist_name, artist_lyrics, artist_lyrics_n
         LYRICS.append((website_name, artist_name, lyrics_name, lyrics))
 
 
-def crawl_vagalume():
+def crawl_cifraclub():
     def get_artists_URLs(home_html):
         def is_artist(tag):
             try:
-                # .meio_no_block div ol li a
+                # #b_alfabeto ul li a
                 return (tag.name == "a"
                         and tag.parent.name == "li"
-                        and tag.parent.parent.name == "ol"
+                        and tag.parent.parent.name == "ul"
                         and tag.parent.parent.parent.name == "div"
-                        and tag.parent.parent.parent.parent.name == "div"
-                        and "meio_no_block" in tag.parent.parent.parent.parent["class"])
+                        and "b_alfabeto" == tag.parent.parent.parent["id"])
             except:
                 return False
 
@@ -45,19 +44,38 @@ def crawl_vagalume():
     def get_songs_URLs(artist_html):
         def is_song(tag):
             try:
-                # .vscroll .tracks li a
-                return (tag.name == "a"
+                # .list-alf ul.list-links li a.tooltip .ico_letra
+                return ("ico_letra" in tag.child["class"]
+                        and tag.name == "a"
+                        and "tooltip" in tag["class"] 
                         and tag.parent.name == "li"
                         and tag.parent.parent.name == "ul"
-                        and "tracks" in tag.parent.parent["class"]
+                        and "list-links" in tag.parent.parent["class"]
                         and tag.parent.parent.parent.name == "div"
-                        and "vscroll" in tag.parent.parent.parent["class"])
+                        and "list-alf" in tag.parent.parent.parent["class"])
             except:
                 return False
 
+        def is_song2(tag):
+            try:
+                # ol.list-links li a.tooltip .ico_letra
+                return ("ico_letra" in tag.child["class"]
+                        and tag.name == "a"
+                        and "tooltip" in tag["class"]
+                        and tag.parent.name == "li"
+                        and tag.parent.parent.name == "ol"
+                        and "list-links" in tag.parent.parent["class"])
+            except:
+                return False
+        
+        
         ret = []
         soup = BeautifulSoup(artist_html, 'html.parser')
+        
         songs_a_tag_list = soup.find_all(is_song)
+        if len(songs_a_tag_list) == 0:
+            songs_a_tag_list = soup.find_all(is_song2)
+        
         for song_a_tag in songs_a_tag_list:
             ret.append(song_a_tag["href"])
         return ret
@@ -65,26 +83,41 @@ def crawl_vagalume():
     def get_lyrics(lyrics_html):
         def is_lyrics(tag):
             try:
-                # .left.originalOnly div
+                # div.p402_premium div.letra-l
                 return (tag.name == "div"
+                        and "letra-l" in tag["class"]
                         and tag.parent.name == "div"
-#                         and "originalOnly" in tag.parent["class"])
-                        and "lyr_original" == tag.parent["id"])
+                        and "p402_premium" in tag.parent["class"])
             except:
                 return False
 
+        def is_lyrics2(tag):
+            try:
+                # div.p402_premium div.letra
+                return (tag.name == "div"
+                        and "letra" in tag["class"]
+                        and tag.parent.name == "div"
+                        and "p402_premium" in tag.parent["class"])
+            except:
+                return False
+        
         ret = []
         soup = BeautifulSoup(lyrics_html, 'html.parser')
+        
         lyrics_tags = soup.find_all(is_lyrics)
+        if len(lyrics_tags) == 0:
+            lyrics_tags = soup.find_all(is_lyrics2)
+        
         for div_tag in lyrics_tags:
-            string_inside = str(div_tag).lstrip('<div itemprop="description">').rstrip('</div>')
+            string_inside = str(div_tag).lstrip('<div class="letra-l">').lstrip('<div class="letra">').rstrip('</div>')
             clean_string_inside = '\n'.join(string_inside.split('<br/>'))
             ret.append(clean_string_inside)
         return '\n'.join(ret)
     
-    website_name = 'vagalume.com.br'
-    base_url = 'https://www.vagalume.com.br'
-    start_url = 'https://www.vagalume.com.br/browse/a.html'
+    website_name = 'cifraclub.com.br'
+    base_url = 'https://www.cifraclub.com.br'
+    start_url = 'https://www.cifraclub.com.br/letra/A/lista.html'
+#     start_url = 'https://webcache.googleusercontent.com/search?q=cache:x7E5LZP5vSkJ:https://www.cifraclub.com.br/cifras/letra_a.html+&cd=2&hl=pt-BR&ct=clnk&gl=br'
 
     global CURRENT_ARTIST
     global SAVED_CURRENT_ARTIST_LYRICS
@@ -129,7 +162,7 @@ if __name__ == '__main__':
     try:
         while not READ_ALL_ARTISTS:
             try:
-                crawl_vagalume()
+                crawl_cifraclub()
             except Exception as e:
                 print("Error reading artist %s.\n%s" % (CURRENT_ARTIST, str(e)))
                 
@@ -141,3 +174,7 @@ if __name__ == '__main__':
                 time.sleep(3)
     finally:
         pickle.dump(LYRICS, open(OUTPUT_PICKLE_PATH, 'wb'))
+        # DEBUG
+        with open('out/lyrics_cifraclub.txt', 'w') as output_file:
+            for line in LYRICS:
+                output_file.write("%s\n" % line)
