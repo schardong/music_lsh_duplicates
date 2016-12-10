@@ -13,6 +13,18 @@ def usage(scriptname):
     exit(1)
 
 
+def is_same_string_from_vagalume(website1_name, website2_name, string1, string2):
+    vagalume_website_name = 'vagalume.com.br'
+    
+    if website1_name != vagalume_website_name or website2_name != vagalume_website_name:
+        return False
+    
+    if string1 == string2 or string1 == string2 + " traducao" or string2 == string1 + " traducao":
+        return True
+    
+    return False
+
+
 def check_match(key1, key2, lyrics1, lyrics2):
     # 'key[12]' is a string with the following: 
     # 'website_name|artist_name|lyrics_name'
@@ -29,19 +41,21 @@ def check_match(key1, key2, lyrics1, lyrics2):
         if not is_same_artist_name:
             return False
         
+        is_same_lyrics_from_vagalume = is_same_string_from_vagalume(key1_split[0], key2_split[0], key1_split[2], key2_split[2])
+        
         # Checks whether lyrics name is the same
         is_same_lyrics_name, _ = is_same_string(key1_split[2], key2_split[2], 1)
-        if not is_same_lyrics_name:
+        if not is_same_lyrics_name and not is_same_lyrics_from_vagalume:
             return False
         
-        # Checks whether one of the lyrics is empty
-        if lyrics1 == "" or lyrics2 == "":
-            return False
-        
-        # Checks whether lyrics is the same
-        is_same_lyrics, _ = is_same_string(lyrics1, lyrics2, 0.1)
-        if not is_same_lyrics:
-            return False
+#         # Checks whether one of the lyrics is empty
+#         if lyrics1 == "" or lyrics2 == "":
+#             return False
+#         
+#         # Checks whether lyrics is the same
+#         is_same_lyrics, _ = is_same_string(lyrics1, lyrics2, 0.1)
+#         if not is_same_lyrics:
+#             return False
     except Exception as e:
         print("Error comparing '%s' and '%s'. Returning False for matching." % (key1, key2))
         return False
@@ -69,9 +83,9 @@ def generate_count_true_and_matches(pickle_processed_dict_filename):
                         matches[(dict_lyrics_key1, dict_lyrics_key2)] = True
                         matches[(dict_lyrics_key2, dict_lyrics_key1)] = True
                         count_true += 1
-                    else:
-                        matches[(dict_lyrics_key1, dict_lyrics_key2)] = False
-                        matches[(dict_lyrics_key2, dict_lyrics_key1)] = False
+#                     else:
+#                         matches[(dict_lyrics_key1, dict_lyrics_key2)] = False
+#                         matches[(dict_lyrics_key2, dict_lyrics_key1)] = False
     
     return count_true, matches
 
