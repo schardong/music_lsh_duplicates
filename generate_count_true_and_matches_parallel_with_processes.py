@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 
+import itertools
 import sys
 import pickle
 from multiprocessing import Process, Queue
@@ -115,54 +116,23 @@ def generate_count_true_and_matches(pickle_processed_dict_filename):
         print("Total number of lyrics:", len(list_keys))
         middle = len(list_keys) // 2
 
-        # First half and First half
-        print("Starting part 1 (out of 4)")
-        list_of_comparisons = []
-        for dict_lyrics_key1 in list_keys[:middle]:
-            for dict_lyrics_key2 in list_keys[:middle]:
-                if dict_lyrics_key1 >= dict_lyrics_key2:
-                    # By including > we only compare each pair once.
-                    continue
-                list_of_comparisons.append((dict_lyrics_key1, dict_lyrics_key2))
+        # First half only
+        print("Starting part 1 (out of 3)")
+        list_of_comparisons = list(itertools.combinations(list_keys[:middle], 2))
         curr_count_true, curr_matches_set = solve(list_of_comparisons)
         count_true_total = curr_count_true
         matches_set_total = curr_matches_set
 
-        # First half and Second half
-        print("Starting part 2 (out of 4)")
-        list_of_comparisons = []
-        for dict_lyrics_key1 in list_keys[:middle]:
-            for dict_lyrics_key2 in list_keys[middle:]:
-                if dict_lyrics_key1 >= dict_lyrics_key2:
-                    # By including > we only compare each pair once.
-                    continue
-                list_of_comparisons.append((dict_lyrics_key1, dict_lyrics_key2))
+        # Mixed halfs
+        print("Starting part 2 (out of 3)")
+        list_of_comparisons = list(itertools.product(list_keys[:middle], list_keys[middle:]))
         curr_count_true, curr_matches_set = solve(list_of_comparisons)
         count_true_total += curr_count_true
         matches_set_total.union(curr_matches_set)
 
-        # Second half and First half
-        print("Starting part 3 (out of 4)")
-        list_of_comparisons = []
-        for dict_lyrics_key1 in list_keys[middle:]:
-            for dict_lyrics_key2 in list_keys[:middle]:
-                if dict_lyrics_key1 >= dict_lyrics_key2:
-                    # By including > we only compare each pair once.
-                    continue
-                list_of_comparisons.append((dict_lyrics_key1, dict_lyrics_key2))
-        curr_count_true, curr_matches_set = solve(list_of_comparisons)
-        count_true_total += curr_count_true
-        matches_set_total.union(curr_matches_set)
-
-        # Second half and Second half
-        print("Starting part 4 (out of 4)")
-        list_of_comparisons = []
-        for dict_lyrics_key1 in list_keys[middle:]:
-            for dict_lyrics_key2 in list_keys[middle:]:
-                if dict_lyrics_key1 >= dict_lyrics_key2:
-                    # By including > we only compare each pair once.
-                    continue
-                list_of_comparisons.append((dict_lyrics_key1, dict_lyrics_key2))
+        # Second half only
+        print("Starting part 3 (out of 3)")
+        list_of_comparisons = list(itertools.combinations(list_keys[middle:], 2))
         curr_count_true, curr_matches_set = solve(list_of_comparisons)
         count_true_total += curr_count_true
         matches_set_total.union(curr_matches_set)
