@@ -4,9 +4,7 @@
 
 import sys
 import pickle
-import string
-from find_duplicates import is_same_string
-
+import itertools
 
 def usage(scriptname):
     print("Usage: %s pickle_processed_dict_filename pickle_count_true_and_matches_filename" % scriptname)
@@ -37,14 +35,17 @@ def check_match(key1, key2, lyrics1, lyrics2):
     
     try:
         # Checks whether artist name is the same
-        is_same_artist_name, _ = is_same_string(key1_split[1], key2_split[1], 1)
+        is_same_artist_name = key1_split[1]== key2_split[1]
         if not is_same_artist_name:
             return False
         
-        is_same_lyrics_from_vagalume = is_same_string_from_vagalume(key1_split[0], key2_split[0], key1_split[2], key2_split[2])
+        is_same_lyrics_from_vagalume = is_same_string_from_vagalume(key1_split[0],
+                                                                    key2_split[0],
+                                                                    key1_split[2],
+                                                                    key2_split[2])
         
         # Checks whether lyrics name is the same
-        is_same_lyrics_name, _ = is_same_string(key1_split[2], key2_split[2], 1)
+        is_same_lyrics_name = key1_split[2] == key2_split[2]
         if not is_same_lyrics_name and not is_same_lyrics_from_vagalume:
             return False
         
@@ -65,28 +66,26 @@ def check_match(key1, key2, lyrics1, lyrics2):
 
 def generate_count_true_and_matches(pickle_processed_dict_filename): 
     count_true = 0
-    matches = {}
+    matches = set()
     
     with open(pickle_processed_dict_filename, "rb") as pickle_processed_dict_file:
         dict_lyrics = pickle.load(pickle_processed_dict_file)
-        
-        for dict_lyrics_key1 in dict_lyrics:
-            for dict_lyrics_key2 in dict_lyrics:
-                if dict_lyrics_key1 == dict_lyrics_key2:
-                    continue
+
+        for key1, key2 in itertools.combinations(dict_lyrics.keys(), 2):
+            if key1 == key2:
+                continue
                 
-                if (dict_lyrics_key1, dict_lyrics_key2) not in matches:
-                    is_a_match = check_match(dict_lyrics_key1, dict_lyrics_key2, \
-                                             dict_lyrics[dict_lyrics_key1], dict_lyrics[dict_lyrics_key2])
+            if (key1, key2) not in matches:
+                is_a_match = check_match(key1,
+                                         key2,
+                                         dict_lyrics[key1],
+                                         dict_lyrics[key2])
                     
-                    if is_a_match:
-                        matches[(dict_lyrics_key1, dict_lyrics_key2)] = True
-                        matches[(dict_lyrics_key2, dict_lyrics_key1)] = True
-                        count_true += 1
-#                     else:
-#                         matches[(dict_lyrics_key1, dict_lyrics_key2)] = False
-#                         matches[(dict_lyrics_key2, dict_lyrics_key1)] = False
-    
+                if is_a_match:
+                    matches.add((key1, key2))
+                    matches.add((key2, key1))
+                    count_true += 1
+
     return count_true, matches
 
 

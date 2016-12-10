@@ -106,7 +106,9 @@ def generate_count_true_and_matches(pickle_processed_dict_filename):
         jobs = divide_work(list_of_comparisons, NUM_PROCS)
         pool_results = []
         with Pool(processes=NUM_PROCS) as p:
+            print('Pool starting.')
             for job in jobs:
+                print('Job starting.')
                 pool_results.append(p.apply_async(save_if_match, job))
 
         for result in pool_results:
