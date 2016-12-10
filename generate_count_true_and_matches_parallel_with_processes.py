@@ -76,6 +76,25 @@ def divide_work(l, num_pieces):
 
 
 def generate_count_true_and_matches(pickle_processed_dict_filename):
+    def solve(list_of_comparisons):
+        jobs = divide_work(list_of_comparisons, NUM_PROCS)
+        process_list = []
+        result_queue = Queue()
+        print("Starting 32 processes")
+        for job in jobs:
+            process_list.append(Process(target=save_if_match, args=(job, result_queue)))
+            process_list[-1].start()
+        for process in process_list:
+            process.join()
+        print("Processes done!")
+        count_true_total = 0
+        matches_set_total = set()
+        while not result_queue.empty():
+            curr_count, curr_matches = result_queue.get()
+            count_true_total += curr_count
+            matches_set_total.union(curr_matches)
+        return count_true_total, matches_set_total
+
     def save_if_match(list_of_pairs_of_dict_lyrics_keys, out_queue):
         matches_set = set()
         for dict_lyrics_key1, dict_lyrics_key2 in list_of_pairs_of_dict_lyrics_keys:
@@ -92,29 +111,61 @@ def generate_count_true_and_matches(pickle_processed_dict_filename):
     with open(pickle_processed_dict_filename, "rb") as pickle_processed_dict_file:
         dict_lyrics = pickle.load(pickle_processed_dict_file)
 
+        list_keys = list(dict_lyrics.keys())
+        print("Total number of lyrics:", len(list_keys))
+        middle = len(list_keys) // 2
+
+        # First half and First half
+        print("Starting part 1 (out of 4)")
         list_of_comparisons = []
-        for dict_lyrics_key1 in dict_lyrics:
-            for dict_lyrics_key2 in dict_lyrics:
+        for dict_lyrics_key1 in list_keys[:middle]:
+            for dict_lyrics_key2 in list_keys[:middle]:
                 if dict_lyrics_key1 >= dict_lyrics_key2:
                     # By including > we only compare each pair once.
                     continue
                 list_of_comparisons.append((dict_lyrics_key1, dict_lyrics_key2))
+        curr_count_true, curr_matches_set = solve(list_of_comparisons)
+        count_true_total = curr_count_true
+        matches_set_total = curr_matches_set
 
-        jobs = divide_work(list_of_comparisons, NUM_PROCS)
-        process_list = []
-        result_queue = Queue()
-        for job in jobs:
-            process_list.append(Process(target=save_if_match, args=(job, result_queue)))
-            process_list[-1].start()
-        for process in process_list:
-            process.join()
+        # First half and Second half
+        print("Starting part 2 (out of 4)")
+        list_of_comparisons = []
+        for dict_lyrics_key1 in list_keys[:middle]:
+            for dict_lyrics_key2 in list_keys[middle:]:
+                if dict_lyrics_key1 >= dict_lyrics_key2:
+                    # By including > we only compare each pair once.
+                    continue
+                list_of_comparisons.append((dict_lyrics_key1, dict_lyrics_key2))
+        curr_count_true, curr_matches_set = solve(list_of_comparisons)
+        count_true_total += curr_count_true
+        matches_set_total.union(curr_matches_set)
 
-        count_true_total = 0
-        matches_set_total = set()
-        while not result_queue.empty():
-            curr_count, curr_matches = result_queue.get()
-            count_true_total += curr_count
-            matches_set_total.union(curr_matches)
+        # Second half and First half
+        print("Starting part 3 (out of 4)")
+        list_of_comparisons = []
+        for dict_lyrics_key1 in list_keys[middle:]:
+            for dict_lyrics_key2 in list_keys[:middle]:
+                if dict_lyrics_key1 >= dict_lyrics_key2:
+                    # By including > we only compare each pair once.
+                    continue
+                list_of_comparisons.append((dict_lyrics_key1, dict_lyrics_key2))
+        curr_count_true, curr_matches_set = solve(list_of_comparisons)
+        count_true_total += curr_count_true
+        matches_set_total.union(curr_matches_set)
+
+        # Second half and Second half
+        print("Starting part 4 (out of 4)")
+        list_of_comparisons = []
+        for dict_lyrics_key1 in list_keys[middle:]:
+            for dict_lyrics_key2 in list_keys[middle:]:
+                if dict_lyrics_key1 >= dict_lyrics_key2:
+                    # By including > we only compare each pair once.
+                    continue
+                list_of_comparisons.append((dict_lyrics_key1, dict_lyrics_key2))
+        curr_count_true, curr_matches_set = solve(list_of_comparisons)
+        count_true_total += curr_count_true
+        matches_set_total.union(curr_matches_set)
 
     return count_true_total, matches_set_total
 
