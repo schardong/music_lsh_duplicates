@@ -4,10 +4,11 @@
 
 import sys
 import pickle
-import string
+import itertools
 from multiprocessing import Pool
 from find_duplicates import is_same_string
 
+NUM_PROCESSES=4
 
 def usage(scriptname):
     print("Usage: %s pickle_processed_dict_filename pickle_count_true_and_matches_filename" % scriptname)
@@ -48,15 +49,7 @@ def check_match(key1, key2, lyrics1, lyrics2):
         is_same_lyrics_name, _ = is_same_string(key1_split[2], key2_split[2], 1)
         if not is_same_lyrics_name and not is_same_lyrics_from_vagalume:
             return False
-        
-#         # Checks whether one of the lyrics is empty
-#         if lyrics1 == "" or lyrics2 == "":
-#             return False
-#         
-#         # Checks whether lyrics is the same
-#         is_same_lyrics, _ = is_same_string(lyrics1, lyrics2, 0.1)
-#         if not is_same_lyrics:
-#             return False
+
     except Exception as e:
         print("Error comparing '%s' and '%s'. Returning False for matching." % (key1, key2))
         return False
@@ -66,28 +59,26 @@ def check_match(key1, key2, lyrics1, lyrics2):
 
 def generate_count_true_and_matches(pickle_processed_dict_filename): 
     count_true = 0
-    matches = {}
+    matches = set()
     
     with open(pickle_processed_dict_filename, "rb") as pickle_processed_dict_file:
         dict_lyrics = pickle.load(pickle_processed_dict_file)
         
-        for dict_lyrics_key1 in dict_lyrics:
-            for dict_lyrics_key2 in dict_lyrics:
-                if dict_lyrics_key1 == dict_lyrics_key2:
-                    continue
+        for key1, key2 in itertools.combinations(dict_lyrics.keys(), 2):
+            if key1 == key2:
+                continue
                 
-                if (dict_lyrics_key1, dict_lyrics_key2) not in matches:
-                    is_a_match = check_match(dict_lyrics_key1, dict_lyrics_key2, \
-                                             dict_lyrics[dict_lyrics_key1], dict_lyrics[dict_lyrics_key2])
+            if (key1, key2) not in matches:
+                is_a_match = check_match(key1,
+                                         key2,
+                                         dict_lyrics[key1],
+                                         dict_lyrics[key2])
                     
-                    if is_a_match:
-                        matches[(dict_lyrics_key1, dict_lyrics_key2)] = True
-                        matches[(dict_lyrics_key2, dict_lyrics_key1)] = True
-                        count_true += 1
-#                     else:
-#                         matches[(dict_lyrics_key1, dict_lyrics_key2)] = False
-#                         matches[(dict_lyrics_key2, dict_lyrics_key1)] = False
-    
+                if is_a_match:
+                    matches.add((key1, key2))
+                    matches.add((key2, key1))
+                    count_true += 1
+
     return count_true, matches
 
 
@@ -109,41 +100,39 @@ def generate_matches(lyrics_dict):
         raise ValueError('Invalid lyrics dictionary')
 
     match_count = 0
-    matches = {}
+    matches = set()
 
-    for key1 in lyrics_dict:
-        for key2 in lyrics_dict:
-            if key1 == key2:
-                continue
+    for key1, key2 in itertools.combinations(lyrics_dict.keys(), 2):
+        if key1 == key2:
+            continue
 
-            if (key1, key2) not in matches:
-                is_match = check_match(key1, key2, lyrics_dict[key1], lyrics_dict[key2])
-                if is_match:
-                    matches[(key1, key2)] = True
-                    matches[(key2, key1)] = True
-                    match_count += 1
+        if (key1, key2) not in matches:
+            is_match = check_match(key1, key2, lyrics_dict[key1], lyrics_dict[key2])
+            if is_match:
+                matches.add((key1, key2))
+                matches.add((key2, key1))
+                match_count += 1
 
     return match_count, matches
 
+if __name__ == "__main__":
+#def main():
+    #if len(sys.argv) < 3:
+    #    usage(sys.argv[0])
 
-def main():
-    if len(sys.argv) < 3:
-        usage(sys.argv[0])
+    pickle_processed_dict_filename = os.path.join('out', 'train_set_pickle')#sys.argv[1]
+    pickle_count_true_and_matches_filename = os.path.join('out', 'train_set_pickle_ground_truth')#sys.argv[2]
 
-    pickle_processed_dict_filename = sys.argv[1]
-    pickle_count_true_and_matches_filename = sys.argv[2]
-
-    #count_true, matches = generate_count_true_and_matches(pickle_processed_dict_filename)
     count_true = []
     matches = []
     with open(pickle_processed_dict_filename, 'rb') as file_input:
         dict_lyrics = pickle.load(file_input)
 
-        step = len(dict_lyrics) / 32
-        dict_chunks = [dict_lyrics.keys()[i:i + step] for i in range(0, len(dict_lyrics), step)]
+        step = int(len(dict_lyrics) / NUM_PROCESSES)
+        ##dict_chunks = [dict_lyrics[i:i + step] for i in range(0, len(dict_lyrics), step)]
 
-        pool = Pool(len(dict_lyrics) / 32)
-        count, match = pool.map(generate_matches, [dict_lyrics[dict_chunks]])
+        pool = Pool(processes=NUM_PROCESSES)
+        count, match = pool.map(generate_matches, dict_lyrics, chunksize=step)
 
         count_true = sum(count)
         matches.extend(match)
@@ -152,5 +141,5 @@ def main():
         pickle.dump((count_true, matches), pickle_count_true_and_matches_file)
 
 
-if __name__ == "__main__":
-    main()
+#if __name__ == "__main__":
+#    main()
