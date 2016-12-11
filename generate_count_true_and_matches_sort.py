@@ -28,6 +28,8 @@ def generate_count_true_and_matches(pickle_processed_dict_filename):
         list_lyrics.sort(key=lambda x: x[0])
 
         for index, elem in enumerate(list_lyrics):
+            if index + 1 == len(list_lyrics):
+                break
             next_comparison_index = index + 1
             while elem[0] == list_lyrics[next_comparison_index][0]:
                 pair = (get_original_string(elem),
