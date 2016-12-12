@@ -1,0 +1,2 @@
+Num.Buckets, Rows.Per.Bucket, Lsh.Threshold, Shingle.Size, Num.Hashes, Precision, Recall
+64, 2, 0.1, 5, 128, 0.08480065914240459, 0.9494234592445328
